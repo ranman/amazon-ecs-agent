@@ -16,8 +16,11 @@ package containermetadata
 import (
 	"fmt"
 
+	"net/http"
+	"io/ioutil"
 	apicontainer "github.com/aws/amazon-ecs-agent/agent/api/container"
 	apitask "github.com/aws/amazon-ecs-agent/agent/api/task"
+	"time"
 
 	"github.com/cihub/seelog"
 	docker "github.com/fsouza/go-dockerclient"
@@ -126,6 +129,7 @@ func parseNetworkMetadata(settings *docker.NetworkSettings, hostConfig *docker.H
 	ipv4AddressFromSettings := settings.IPAddress
 	networkModeFromHostConfig := hostConfig.NetworkMode
 
+	availabilityZone, _ := getAvailabilityZone()
 	// Extensive Network information is not available for Docker API versions 1.17-1.20
 	// Instead we only get the details of the first network
 	networkList := make([]Network, 0)
@@ -133,16 +137,30 @@ func parseNetworkMetadata(settings *docker.NetworkSettings, hostConfig *docker.H
 		for modeFromSettings, containerNetwork := range settings.Networks {
 			networkMode := modeFromSettings
 			ipv4Addresses := []string{containerNetwork.IPAddress}
-			network := Network{NetworkMode: networkMode, IPv4Addresses: ipv4Addresses}
+			network := Network{NetworkMode: networkMode, IPv4Addresses: ipv4Addresses, AvailabilityZone: availabilityZone}
 			networkList = append(networkList, network)
 		}
 	} else {
 		ipv4Addresses := []string{ipv4AddressFromSettings}
-		network := Network{NetworkMode: networkModeFromHostConfig, IPv4Addresses: ipv4Addresses}
+		network := Network{NetworkMode: networkModeFromHostConfig, IPv4Addresses: ipv4Addresses, AvailabilityZone: availabilityZone}
 		networkList = append(networkList, network)
 	}
 
 	return NetworkMetadata{
 		networks: networkList,
 	}, nil
+}
+
+func getAvailabilityZone() (string, error) {
+	client := &http.Client{Timeout: 5 * time.Millisecond}
+	response, err := client.Get("http://169.254.169.254/latest/meta-data/placement/availability-zone")
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	contents, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(contents), nil
 }

@@ -88,6 +88,7 @@ type Network struct {
 	NetworkMode   string   `json:"NetworkMode,omitempty"`
 	IPv4Addresses []string `json:"IPv4Addresses,omitempty"`
 	IPv6Addresses []string `json:"IPv6Addresses,omitempty"`
+	AvailabilityZone string `json:"AvailabilityZone,omitempty"`
 }
 
 // NetworkMetadata keeps track of the data we parse from the Network Settings
